@@ -16,12 +16,12 @@ type Todo struct {
 	Title       string
 	Completed   bool
 	CreatedAt   time.Time
-	CompletedAt *time.Time // can be nil
+	CompletedAt *time.Time // pointer makes it nullable
 }
 
 type Todos []Todo
 
-func New(title string) *Todo {
+func NewTodo(title string) *Todo {
 	return &Todo{uuid.New(), title, false, time.Now(), nil}
 }
 
@@ -35,12 +35,12 @@ func (t *Todo) Toggle() {
 	}
 }
 
-type TodoRepo struct {
+type AppDB struct {
 	db *sql.DB
 }
 
-func (t *TodoRepo) CreateTodo(title string) (*Todo, error) {
-	ntodo := New(title)
+func (t *AppDB) CreateTodo(title string) (*Todo, error) {
+	ntodo := NewTodo(title)
 	query := "INSERT INTO todos (id, title, created_at) VALUES (?, ?, ?)"
 	_, err := t.db.Exec(
 		query,
@@ -56,7 +56,7 @@ func (t *TodoRepo) CreateTodo(title string) (*Todo, error) {
 	return ntodo, err
 }
 
-func (tdb *TodoRepo) GetTodos() (todos Todos, err error) {
+func (tdb *AppDB) GetTodos() (todos Todos, err error) {
 	query := "SELECT id, title, completed, created_at, completed_at FROM todos ORDER BY created_at DESC"
 	rows, err := tdb.db.Query(query)
 	if err != nil {
@@ -88,7 +88,7 @@ func (tdb *TodoRepo) GetTodos() (todos Todos, err error) {
 	return todos, nil
 }
 
-func NewDB() *TodoRepo {
+func NewDB() *AppDB {
 	db, err := sql.Open("sqlite", "todos.db")
 	if err != nil {
 		if db != nil {
@@ -105,9 +105,9 @@ func NewDB() *TodoRepo {
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		completed_at DATETIME NULL
 	)`,
-		// tilte unique index
+		// Unique index on title
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_todos_title_unique ON todos (title)`,
-		// archive table
+		// Archive table
 		`CREATE TABLE IF NOT EXISTS todos_archive (
 		id TEXT PRIMARY KEY,
 		title TEXT NOT NULL,
@@ -116,15 +116,14 @@ func NewDB() *TodoRepo {
 		completed_at DATETIME NULL,
 		archived_at DATETIME NOT NULL
 	)`,
-		// trigger for archive table
-		// prevent updates to archive
+		// Trigger for archive table
+		// Prevent update trigger
 		`CREATE TRIGGER IF NOT EXISTS prevent_archive_update
 	BEFORE UPDATE ON todos_archive
 	BEGIN
 		SELECT RAISE(ABORT, 'Archive table is readonly - updates not allowed');
 	END`,
-		// prevent deletes
-		// delete the whole file if you want to delete archives
+		// Prevent delete trigger. Delete '*.db' file to delete archives
 		`CREATE TRIGGER IF NOT EXISTS prevent_archive_delete
 	BEFORE DELETE ON todos_archive
 	BEGIN
@@ -139,10 +138,10 @@ func NewDB() *TodoRepo {
 		}
 	}
 
-	return &TodoRepo{db}
+	return &AppDB{db}
 }
 
-func (t *TodoRepo) Close() error {
+func (t *AppDB) Close() error {
 	return t.db.Close()
 }
 
@@ -150,6 +149,9 @@ func main() {
 	db := NewDB()
 	defer db.Close()
 	todos, err := db.GetTodos()
+	if todos == nil {
+		todos = []Todo{}
+	}
 	var titles []string
 	for _, t := range todos {
 		titles = append(titles, t.Title)
