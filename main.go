@@ -11,7 +11,9 @@ import (
 	"github.com/fitzy1321/go-todo/internal/todo"
 )
 
-var baseStyle = lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("240"))
+var baseStyle = lipgloss.NewStyle().
+	BorderStyle(lipgloss.NormalBorder()).
+	BorderForeground(lipgloss.Color("240"))
 
 type model struct {
 	table table.Model
@@ -86,7 +88,7 @@ func main() {
 	db := db.New()
 	defer db.Close()
 
-	if _, err := tea.NewProgram(initModel(db)).Run(); err != nil {
+	if _, err := tea.NewProgram(initModel(db), tea.WithAltScreen()).Run(); err != nil {
 		log.Fatalf("An error occured: %v", err)
 	}
 }
