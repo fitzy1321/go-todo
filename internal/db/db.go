@@ -69,6 +69,9 @@ func New() *AppDB {
 }
 
 func (a *AppDB) Close() error {
+	if a.db == nil {
+		return nil
+	}
 	return a.db.Close()
 }
 
@@ -89,7 +92,7 @@ func (a *AppDB) CreateTodo(title string) (*todo.Todo, error) {
 	return ntodo, err
 }
 
-func (a *AppDB) ListAllTodos() (todos []todo.Todo, err error) {
+func (a *AppDB) ListAllTodos() (todos todo.Todos, err error) {
 	query := "SELECT id, title, completed, created_at, completed_at FROM todos ORDER BY created_at DESC"
 	rows, err := a.db.Query(query)
 	if err != nil {
