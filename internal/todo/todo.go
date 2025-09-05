@@ -1,6 +1,7 @@
 package todo
 
 import (
+	"slices"
 	"strconv"
 	"time"
 
@@ -69,4 +70,26 @@ func (t *Todos) Rows() []table.Row {
 		rows = append(rows, todo.Row())
 	}
 	return rows
+}
+
+func (t *Todos) Columns() []table.Column {
+	uuidW := len(uuid.New().String())
+	timeW := len(time.Now().String())
+
+	var titleW int = 4
+	if len(*t) > 0 {
+		var titleLens []int
+		for _, item := range t.GetTitles() {
+			titleLens = append(titleLens, len(item))
+		}
+		titleW = slices.Max(titleLens)
+	}
+
+	return []table.Column{
+		{Title: "ID", Width: uuidW},
+		{Title: "Todo", Width: titleW},
+		{Title: "Completed", Width: 9},
+		{Title: "Created At", Width: timeW},
+		{Title: "Completed At", Width: timeW},
+	}
 }

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fitzy1321/go-todo/internal/db"
 	"github.com/google/uuid"
@@ -13,6 +14,10 @@ const (
 	entryFormView
 )
 
+type AppKeyMap struct {
+	TodoTableKeyMap
+}
+
 type AppModel struct {
 	db    *db.AppDB
 	state sessionState
@@ -20,6 +25,8 @@ type AppModel struct {
 	entryForm tea.Model
 	table     tea.Model
 	extra     string
+
+	keyMap AppKeyMap
 }
 
 func NewApp(db *db.AppDB) *AppModel {
@@ -31,13 +38,14 @@ func NewApp(db *db.AppDB) *AppModel {
 		state:     tableView,
 		entryForm: addTodoForm,
 		table:     table,
+		keyMap:    AppKeyMap{DefaultTodoTableKeyMap()},
 	}
 	return &t
 }
 
 type (
-	EntryFormMsg struct{}
 	TableMsg     struct{}
+	EntryFormMsg struct{}
 	ToggleMsg    struct{ id uuid.UUID }
 	DeleteMsg    struct{ id uuid.UUID }
 )
@@ -62,12 +70,16 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = tableView
 
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
+		switch {
+		case key.Matches(msg, m.keyMap.Quit):
 			return m, tea.Quit
-
-		case "n":
-			// Make a new Todo
+		case key.Matches(msg, m.keyMap.Help):
+			if m.state == tableView {
+				m.table, cmd = m.table.Update(msg)
+				return m, cmd
+			}
+		case key.Matches(msg, m.keyMap.New):
+			// Change state to Show EntryForm
 			if m.state == tableView {
 				mTable := m.table.(TodoTableModel)
 				mTable.Blur()
@@ -77,10 +89,14 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.entryForm = mEntryForm
 				return m, func() tea.Msg { return EntryFormMsg{} }
 			}
-		case "d":
-			// delete Todo
+		case key.Matches(msg, m.keyMap.Delete):
+			// Delete Todo
 			if m.state == tableView {
 				mTable := m.table.(TodoTableModel)
+				if len(mTable.todos) == 0 {
+					return m, nil
+				}
+
 				id, err := mTable.SelectedId()
 				if err != nil {
 					m.extra = err.Error()
@@ -93,9 +109,14 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.table, cmd = mTable.Update(DeleteMsg{id: *id})
 				return m, cmd
 			}
-		case "t":
+		case key.Matches(msg, m.keyMap.Toggle):
+			// Toggle Todo.Completed
 			if m.state == tableView {
 				mTable := m.table.(TodoTableModel)
+				if len(mTable.todos) == 0 {
+					return m, nil
+				}
+
 				id, err := mTable.SelectedId()
 				if err != nil {
 					m.extra = err.Error()
@@ -108,14 +129,16 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.table, cmd = mTable.Update(ToggleMsg{id: *id})
 				return m, cmd
 			}
-		case "enter":
+		case msg.String() == "enter":
 			if m.state == entryFormView {
+				// Get value from form
 				mTable := m.table.(TodoTableModel)
 				mEntryForm := m.entryForm.(EntryFormModel)
 				title := mEntryForm.Value()
 				if title == "" {
 					return m, nil
 				}
+				// Make a new Todo
 				if err := mTable.AddTodo(title); err != nil {
 					// TODO: do something here
 				}
@@ -124,6 +147,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.entryForm = mEntryForm
 				mTable.Focus()
 				m.table = mTable
+				// send tea.Cmd to update
 				return m, func() tea.Msg { return TableMsg{} }
 			}
 		}
@@ -142,10 +166,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m AppModel) View() string {
 	switch m.state {
 	case tableView:
+		res := "Golang Todo TUI\n\n" + m.table.View()
 		if m.extra != "" {
-			return m.table.View() + "\n" + m.extra + "\n"
+			res += "\n" + m.extra + "\n"
 		}
-		return m.table.View()
+		return res
+
 	case entryFormView:
 		return m.entryForm.View()
 	default:

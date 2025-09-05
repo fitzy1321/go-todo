@@ -3,9 +3,9 @@ package tui
 import (
 	"errors"
 	"log"
-	"slices"
-	"time"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -14,16 +14,66 @@ import (
 	"github.com/google/uuid"
 )
 
-var baseStyle = lipgloss.NewStyle().
-	BorderStyle(lipgloss.RoundedBorder()).
-	BorderForeground(lipgloss.Color("252"))
-
 type TodoTableModel struct {
-	db     *db.AppDB
-	errStr string
+	db *db.AppDB
 
-	table table.Model
+	errStr     string
+	isShowHelp bool
+
 	todos todo.Todos
+
+	table  table.Model
+	keyMap TodoTableKeyMap
+	help   help.Model
+}
+
+type TodoTableKeyMap struct {
+	LineUp   key.Binding
+	LineDown key.Binding
+	New      key.Binding
+	Toggle   key.Binding
+	Delete   key.Binding
+	Help     key.Binding
+	Quit     key.Binding
+}
+
+func (k TodoTableKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{k.LineUp, k.LineDown, k.New, k.Toggle, k.Delete, k.Help, k.Quit}
+}
+
+func (k TodoTableKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{k.LineUp, k.LineDown, k.New, k.Toggle, k.Delete},
+		{k.Help, k.Quit},
+	}
+}
+
+func DefaultTodoTableKeyMap() TodoTableKeyMap {
+	tBindings := table.DefaultKeyMap()
+	return TodoTableKeyMap{
+		LineUp:   tBindings.LineUp,
+		LineDown: tBindings.LineDown,
+		New: key.NewBinding(
+			key.WithKeys("n"),
+			key.WithHelp("n", "new"),
+		),
+		Toggle: key.NewBinding(
+			key.WithKeys("t"),
+			key.WithHelp("t", "toggle"),
+		),
+		Delete: key.NewBinding(
+			key.WithKeys("d"),
+			key.WithHelp("d", "delete"),
+		),
+		Help: key.NewBinding(
+			key.WithKeys("h"),
+			key.WithHelp("h", "help"),
+		),
+		Quit: key.NewBinding(
+			key.WithKeys("ctrl+c", "q"),
+			key.WithHelp("q/ctrl+c", "quit"),
+		),
+	}
 }
 
 /* tea.Model Interface: Init, Update, View */
@@ -45,18 +95,29 @@ func (m TodoTableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table.Focus()
 	case tea.KeyMsg:
+		switch {
+		case key.Matches(msg, m.keyMap.Help):
+			m.isShowHelp = !m.isShowHelp
+		}
 		m.table, cmd = m.table.Update(msg)
 		return m, cmd
 
 	case tea.WindowSizeMsg:
-		w_off, h_off := 2, 10
-		m.initTable(msg.Width-w_off, msg.Height-h_off)
+		// added offsets, for funzzies
+		m.initTable(msg.Width-2, msg.Height-8)
 	}
 	return m, nil
 }
 
+var baseStyle = lipgloss.NewStyle().
+	BorderStyle(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("252"))
+
 func (m TodoTableModel) View() string {
-	res := baseStyle.Render(m.table.View())
+	res := baseStyle.Render(m.table.View()) + "\n"
+	if m.isShowHelp {
+		res += m.help.View(m.keyMap)
+	}
 	if m.errStr != "" {
 		res += "\n" + m.errStr
 	}
@@ -66,7 +127,13 @@ func (m TodoTableModel) View() string {
 /* Public Functions */
 
 func NewTodoTable(db *db.AppDB) TodoTableModel {
-	return TodoTableModel{db: db, table: table.New(), todos: todo.Todos{}}
+	return TodoTableModel{
+		db:     db,
+		todos:  todo.Todos{},
+		table:  table.New(),
+		keyMap: DefaultTodoTableKeyMap(),
+		help:   help.New(),
+	}
 }
 
 func (m *TodoTableModel) AddTodo(title string) error {
@@ -77,7 +144,7 @@ func (m *TodoTableModel) AddTodo(title string) error {
 	m.todos = append(m.todos, t)
 
 	m.table = table.New(
-		table.WithColumns(m.table.Columns()),
+		table.WithColumns(m.todos.Columns()),
 		table.WithRows(append(m.table.Rows(), t.Row())),
 		table.WithFocused(m.table.Focused()),
 		table.WithWidth(m.table.Width()),
@@ -170,35 +237,16 @@ func (m *TodoTableModel) Delete(id uuid.UUID) error {
 
 func (m *TodoTableModel) initTable(w, h int) {
 	var err error
-	var titleW int = 4
 
 	m.todos, err = m.db.ListAllTodos()
 	if err != nil {
 		log.Fatal(err)
-	}
-	if m.todos == nil {
+	} else if m.todos == nil {
 		m.todos = todo.NewTodos()
-	} else if len(m.todos) > 0 {
-		var titleLens []int
-		for _, item := range m.todos.GetTitles() {
-			titleLens = append(titleLens, len(item))
-		}
-		titleW = slices.Max(titleLens)
-	}
-
-	uuidW := len(uuid.New().String())
-	timeW := len(time.Now().String())
-
-	columns := []table.Column{
-		{Title: "ID", Width: uuidW},
-		{Title: "Todo", Width: titleW},
-		{Title: "Completed", Width: 9},
-		{Title: "Created At", Width: timeW},
-		{Title: "Completed At", Width: timeW},
 	}
 
 	m.table = table.New(
-		table.WithColumns(columns),
+		table.WithColumns(m.todos.Columns()),
 		table.WithRows(m.todos.Rows()),
 		table.WithFocused(true),
 		table.WithWidth(w),
