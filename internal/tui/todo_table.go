@@ -3,6 +3,7 @@ package tui
 import (
 	"errors"
 	"log"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -142,10 +143,13 @@ func (m *TodoTableModel) AddTodo(title string) {
 		m.errStr = err.Error()
 	}
 	m.todos = append(m.todos, t)
+	sort.Slice(m.todos, func(i, j int) bool {
+		return m.todos[i].CreatedAt.Before(m.todos[j].CreatedAt)
+	})
 
 	m.table = table.New(
 		table.WithColumns(m.todos.Columns()),
-		table.WithRows(append(m.table.Rows(), t.Row())),
+		table.WithRows(m.todos.Rows()),
 		table.WithFocused(m.table.Focused()),
 		table.WithWidth(m.table.Width()),
 		table.WithHeight(m.table.Height()),
@@ -160,19 +164,38 @@ func (m *TodoTableModel) Focus() {
 	m.table.Focus()
 }
 
-func (m *TodoTableModel) SelectedId() *uuid.UUID {
+type (
+	ZeroTodosError struct{}
+	NilRowError    struct{}
+)
+
+func (e ZeroTodosError) Error() string {
+	return ""
+}
+func (e NilRowError) Error() string {
+	return ""
+}
+
+// Error my return 3 different types
+// 1. std `error`
+// 2. `ZeroTodosError` ~ when the todos slice is empty
+// 3. `NilRowError` ~ when m.tables.SelectedRow() returns nil
+//   - This happens sometimes when the table cursor is out-of-bonds
+func (m *TodoTableModel) SelectedId() (*uuid.UUID, error) {
 	if len(m.todos) == 0 {
-		return nil
+		return nil, ZeroTodosError{}
 	}
 
 	row := m.table.SelectedRow()
+	if row == nil {
+		return nil, NilRowError{}
+	}
 	id, err := uuid.Parse(row[0])
 	if err != nil {
-		m.errStr = err.Error()
-		return nil
+		return nil, err
 	}
 
-	return &id
+	return &id, nil
 }
 
 func (m *TodoTableModel) Toggle(id uuid.UUID) error {
@@ -216,7 +239,7 @@ func (m *TodoTableModel) Delete(id uuid.UUID) error {
 	}
 
 	if len(m.todos) > 1 {
-		m.todos = append(m.todos[:*index], m.todos[(*index)+1:]...)
+		m.todos = append(m.todos[:*index], m.todos[*index+1:]...)
 		rows := m.table.Rows()
 		for i, r := range rows {
 			if r[0] == mTodo.ID.String() {
@@ -225,9 +248,11 @@ func (m *TodoTableModel) Delete(id uuid.UUID) error {
 			}
 		}
 		m.table.SetRows(append(rows[:*index], rows[*index+1:]...))
+		m.table.SetCursor(*index - 1)
 	} else {
 		m.todos = todo.Todos{}
 		m.table.SetRows([]table.Row{})
+		m.table.SetCursor(0)
 	}
 
 	return nil

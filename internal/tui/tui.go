@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -98,14 +99,16 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Delete Todo
 			if m.state == tableView {
 				mTable := m.table.(TodoTableModel)
-				if len(mTable.todos) == 0 {
-					m.errorStr = "'delete': No items to delete"
-					return m, nil
-				}
-
-				id := mTable.SelectedId()
-				if id == nil {
-					m.errorStr = "'delete': could not find selected row's id"
+				id, err := mTable.SelectedId()
+				if err != nil {
+					switch err.(type) {
+					case ZeroTodosError:
+						m.errorStr = "'delete': No items to delete"
+					case NilRowError:
+						m.errorStr = "Move the cursor first ..."
+					default:
+						m.errorStr = fmt.Sprintf("'delete': could not find selected row's id %s", err.Error())
+					}
 					return m, nil
 				}
 				m.table, cmd = mTable.Update(DeleteMsg{id: *id})
@@ -115,14 +118,17 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Toggle Todo.Completed
 			if m.state == tableView {
 				mTable := m.table.(TodoTableModel)
-				if len(mTable.todos) == 0 {
-					m.errorStr = "'toggle': No items to toggle"
-					return m, nil
-				}
+				id, err := mTable.SelectedId()
+				if err != nil {
+					switch err.(type) {
+					case ZeroTodosError:
+						m.errorStr = "'toggle': No items to toggle"
+					case NilRowError:
+						m.errorStr = "Move the cursor first ..."
+					default:
+						m.errorStr = fmt.Sprintf("'toggle': could not find selected row's %s", err.Error())
+					}
 
-				id := mTable.SelectedId()
-				if id == nil {
-					m.errorStr = "'toggle': could not find selected row's"
 					return m, nil
 				}
 				m.table, cmd = mTable.Update(ToggleMsg{id: *id})

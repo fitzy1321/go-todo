@@ -92,7 +92,7 @@ func (a *AppDB) CreateTodo(title string) (todo.Todo, error) {
 }
 
 func (a *AppDB) ListAllTodos() (todo.Todos, error) {
-	query := "SELECT id, title, completed, created_at, completed_at FROM todos ORDER BY created_at DESC"
+	query := "SELECT id, title, completed, created_at, completed_at FROM todos ORDER BY created_at"
 	rows, err := a.db.Query(query)
 	if err != nil {
 		return nil, err
