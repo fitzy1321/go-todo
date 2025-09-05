@@ -30,17 +30,17 @@ type TodoArchive struct {
 	Todo
 }
 
-func New(title string) *Todo {
-	return &Todo{uuid.New(), title, false, time.Now(), nil}
+func New(title string) Todo {
+	return Todo{uuid.New(), title, false, time.Now(), nil}
 }
 
 func NewTodos() Todos {
 	return Todos{}
 }
 
-func (t Todos) GetTitles() []string {
-	titles := make([]string, len(t))
-	for _, item := range t {
+func (t *Todos) GetTitles() []string {
+	var titles []string
+	for _, item := range *t {
 		titles = append(titles, item.Title)
 	}
 	return titles

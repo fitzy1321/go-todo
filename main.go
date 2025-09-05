@@ -1,24 +1,29 @@
 package main
 
 import (
-	"log"
+	"fmt"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fitzy1321/go-todo/internal/db"
 	"github.com/fitzy1321/go-todo/internal/tui"
 )
 
-// func (m Model) Init() tea.Cmd { return m.spinner.Tick }
-var Model *tui.TodoTableModel
-
 func main() {
-	adb := db.New()
+	adb, err := db.New("todos.db")
+	if err != nil {
+		fmt.Printf("Bummer about your database:%v", err)
+		os.Exit(1)
+	}
+	if adb == nil {
+		fmt.Print("Couldn't get the db! crashing out bruh ...")
+		os.Exit(1)
+	}
 	defer adb.Close()
 
-	Model = tui.NewTodoModel(adb)
-
-	p := tea.NewProgram(Model, tea.WithAltScreen())
+	p := tea.NewProgram(tui.NewApp(adb), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
-		log.Fatalf("An error occured: %v", err)
+		fmt.Printf("An error occured: %v", err)
+		os.Exit(1)
 	}
 }

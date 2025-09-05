@@ -3,7 +3,6 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/fitzy1321/go-todo/internal/todo"
@@ -15,13 +14,13 @@ type AppDB struct {
 	db *sql.DB
 }
 
-func New() *AppDB {
-	db, err := sql.Open("sqlite", "todos.db")
+func New(path string) (*AppDB, error) {
+	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		if db != nil {
 			db.Close()
 		}
-		log.Fatal(err)
+		return nil, err
 	}
 
 	queries := []string{`
@@ -61,11 +60,11 @@ func New() *AppDB {
 	for _, q := range queries {
 		_, err = db.Exec(q)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 	}
 
-	return &AppDB{db}
+	return &AppDB{db}, nil
 }
 
 func (a *AppDB) Close() error {
@@ -75,7 +74,7 @@ func (a *AppDB) Close() error {
 	return a.db.Close()
 }
 
-func (a *AppDB) CreateTodo(title string) (*todo.Todo, error) {
+func (a *AppDB) CreateTodo(title string) (todo.Todo, error) {
 	ntodo := todo.New(title)
 	query := "INSERT INTO todos (id, title, created_at) VALUES (?, ?, ?)"
 	_, err := a.db.Exec(
@@ -92,7 +91,7 @@ func (a *AppDB) CreateTodo(title string) (*todo.Todo, error) {
 	return ntodo, err
 }
 
-func (a *AppDB) ListAllTodos() (todos todo.Todos, err error) {
+func (a *AppDB) ListAllTodos() (todo.Todos, error) {
 	query := "SELECT id, title, completed, created_at, completed_at FROM todos ORDER BY created_at DESC"
 	rows, err := a.db.Query(query)
 	if err != nil {
@@ -100,6 +99,7 @@ func (a *AppDB) ListAllTodos() (todos todo.Todos, err error) {
 	}
 	defer rows.Close()
 
+	todos := todo.NewTodos()
 	for rows.Next() {
 		var todo todo.Todo
 		var idStr string
@@ -154,4 +154,13 @@ func (a *AppDB) ListAllArchives() (archive []todo.TodoArchive, err error) {
 		archive = append(archive, todo)
 	}
 	return archive, nil
+}
+
+func (a *AppDB) UpdateTodo(t todo.Todo) error {
+	query := "UPDATE todos SET title=?, completed=? completed_at=? WHERE id=?"
+	_, err := a.db.Exec(query, t.Title, t.Completed, t.CompletedAt, t.ID)
+	if err != nil {
+		return err
+	}
+	return nil
 }
