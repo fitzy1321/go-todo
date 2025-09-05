@@ -103,24 +103,25 @@ func (m TodoTableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		// added offsets, for funzzies
-		m.initTable(msg.Width-2, msg.Height-8)
+		m.initTable(msg.Width-2, msg.Height-7)
 	}
 	return m, nil
 }
 
-var baseStyle = lipgloss.NewStyle().
+var tableStyle = lipgloss.NewStyle().
 	BorderStyle(lipgloss.RoundedBorder()).
 	BorderForeground(lipgloss.Color("252"))
 
 func (m TodoTableModel) View() string {
-	res := baseStyle.Render(m.table.View()) + "\n"
+	var b strings.Builder
+	b.WriteString(tableStyle.Render(m.table.View()) + "\n")
 	if m.showHelp {
-		res += m.help.View(m.keyMap)
+		b.WriteString(m.help.View(m.keyMap) + "\n")
 	}
 	if m.errStr != "" {
-		res += "\n" + m.errStr
+		b.WriteString(errorStyle.Render(m.errStr))
 	}
-	return res
+	return b.String()
 }
 
 /* Public Functions */

@@ -23,7 +23,7 @@ func (m EntryFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m EntryFormModel) View() string {
-	return fmt.Sprintf("Enter Title for new Todo Item:\n\n%s", m.text.View())
+	return fmt.Sprintf("Enter Title for new Todo Item\n%s", m.text.View())
 }
 
 /* Public Functions */

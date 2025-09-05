@@ -1,8 +1,11 @@
 package tui
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/fitzy1321/go-todo/internal/db"
 	"github.com/google/uuid"
 )
@@ -159,14 +162,22 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+var (
+	titleStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("252"))
+	errorStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#B50235"))
+)
+
 func (m AppModel) View() string {
 	switch m.state {
 	case tableView:
-		res := "Golang Todo TUI\n\n" + m.table.View()
+		var b strings.Builder
+		b.WriteString(titleStyle.Render("Golang Todo TUI") + "\n\n" + m.table.View() + "\n")
 		if m.errorStr != "" {
-			res += "\n" + m.errorStr
+			b.WriteString(errorStyle.Render(m.errorStr))
 		}
-		return res
+		return b.String()
 
 	case entryFormView:
 		return m.entryForm.View()
