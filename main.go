@@ -12,7 +12,7 @@ import (
 func main() {
 	adb, err := db.New("todos.db")
 	if err != nil {
-		fmt.Printf("Bummer about your database:%v", err)
+		fmt.Printf("Bummer about your database: %v", err)
 		os.Exit(1)
 	}
 	if adb == nil {

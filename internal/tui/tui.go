@@ -19,14 +19,14 @@ type AppKeyMap struct {
 }
 
 type AppModel struct {
-	db    *db.AppDB
-	state sessionState
+	db       *db.AppDB
+	errorStr string
+	keyMap   AppKeyMap
+	state    sessionState
 
+	// Nested Models
 	entryForm tea.Model
 	table     tea.Model
-	extra     string
-
-	keyMap AppKeyMap
 }
 
 func NewApp(db *db.AppDB) *AppModel {
@@ -61,7 +61,7 @@ func (t *DeleteMsg) Id() uuid.UUID {
 func (m AppModel) Init() tea.Cmd { return nil }
 
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	m.extra = ""
+	m.errorStr = ""
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case EntryFormMsg:
@@ -84,9 +84,11 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				mTable := m.table.(TodoTableModel)
 				mTable.Blur()
 				m.table = mTable
+
 				mEntryForm := m.entryForm.(EntryFormModel)
 				mEntryForm.Focus()
 				m.entryForm = mEntryForm
+
 				return m, func() tea.Msg { return EntryFormMsg{} }
 			}
 		case key.Matches(msg, m.keyMap.Delete):
@@ -94,16 +96,13 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.state == tableView {
 				mTable := m.table.(TodoTableModel)
 				if len(mTable.todos) == 0 {
+					m.errorStr = "'delete': No items to delete"
 					return m, nil
 				}
 
-				id, err := mTable.SelectedId()
-				if err != nil {
-					m.extra = err.Error()
-					return m, nil
-				}
+				id := mTable.SelectedId()
 				if id == nil {
-					m.extra = "Warn: 'delete cmd' could not find todo object"
+					m.errorStr = "'delete': could not find selected row's id"
 					return m, nil
 				}
 				m.table, cmd = mTable.Update(DeleteMsg{id: *id})
@@ -114,16 +113,13 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.state == tableView {
 				mTable := m.table.(TodoTableModel)
 				if len(mTable.todos) == 0 {
+					m.errorStr = "'toggle': No items to toggle"
 					return m, nil
 				}
 
-				id, err := mTable.SelectedId()
-				if err != nil {
-					m.extra = err.Error()
-					return m, nil
-				}
+				id := mTable.SelectedId()
 				if id == nil {
-					m.extra = "Warn: 'toggle cmd' could not find todo object"
+					m.errorStr = "'toggle': could not find selected row's"
 					return m, nil
 				}
 				m.table, cmd = mTable.Update(ToggleMsg{id: *id})
@@ -132,21 +128,21 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case msg.String() == "enter":
 			if m.state == entryFormView {
 				// Get value from form
-				mTable := m.table.(TodoTableModel)
 				mEntryForm := m.entryForm.(EntryFormModel)
-				title := mEntryForm.Value()
-				if title == "" {
+				newTitle := mEntryForm.Value()
+				if newTitle == "" {
 					return m, nil
-				}
-				// Make a new Todo
-				if err := mTable.AddTodo(title); err != nil {
-					// TODO: do something here
 				}
 				mEntryForm = NewEntryForm()
 				mEntryForm.Blur()
 				m.entryForm = mEntryForm
+
+				// Make a new Todo
+				mTable := m.table.(TodoTableModel)
+				mTable.AddTodo(newTitle)
 				mTable.Focus()
 				m.table = mTable
+
 				// send tea.Cmd to update
 				return m, func() tea.Msg { return TableMsg{} }
 			}
@@ -167,8 +163,8 @@ func (m AppModel) View() string {
 	switch m.state {
 	case tableView:
 		res := "Golang Todo TUI\n\n" + m.table.View()
-		if m.extra != "" {
-			res += "\n" + m.extra + "\n"
+		if m.errorStr != "" {
+			res += "\n" + m.errorStr
 		}
 		return res
 

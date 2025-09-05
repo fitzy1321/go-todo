@@ -3,6 +3,7 @@ package todo
 import (
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -73,8 +74,9 @@ func (t *Todos) Rows() []table.Row {
 }
 
 func (t *Todos) Columns() []table.Column {
-	uuidW := len(uuid.New().String())
-	timeW := len(time.Now().String())
+	var bytes [36]byte
+	uuidW := len(string(bytes[:]))
+	timeW := len(strings.TrimSpace(time.Now().String()))
 
 	var titleW int = 4
 	if len(*t) > 0 {

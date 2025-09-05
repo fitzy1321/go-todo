@@ -3,6 +3,7 @@ package tui
 import (
 	"errors"
 	"log"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -15,12 +16,10 @@ import (
 )
 
 type TodoTableModel struct {
-	db *db.AppDB
-
-	errStr     string
-	isShowHelp bool
-
-	todos todo.Todos
+	db       *db.AppDB
+	errStr   string
+	showHelp bool
+	todos    todo.Todos
 
 	table  table.Model
 	keyMap TodoTableKeyMap
@@ -97,7 +96,7 @@ func (m TodoTableModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keyMap.Help):
-			m.isShowHelp = !m.isShowHelp
+			m.showHelp = !m.showHelp
 		}
 		m.table, cmd = m.table.Update(msg)
 		return m, cmd
@@ -115,7 +114,7 @@ var baseStyle = lipgloss.NewStyle().
 
 func (m TodoTableModel) View() string {
 	res := baseStyle.Render(m.table.View()) + "\n"
-	if m.isShowHelp {
+	if m.showHelp {
 		res += m.help.View(m.keyMap)
 	}
 	if m.errStr != "" {
@@ -136,10 +135,10 @@ func NewTodoTable(db *db.AppDB) TodoTableModel {
 	}
 }
 
-func (m *TodoTableModel) AddTodo(title string) error {
-	t, err := m.db.CreateTodo(title)
+func (m *TodoTableModel) AddTodo(title string) {
+	t, err := m.db.CreateTodo(strings.TrimSpace(title))
 	if err != nil {
-		return err
+		m.errStr = err.Error()
 	}
 	m.todos = append(m.todos, t)
 
@@ -150,7 +149,6 @@ func (m *TodoTableModel) AddTodo(title string) error {
 		table.WithWidth(m.table.Width()),
 		table.WithHeight(m.table.Height()),
 	)
-	return nil
 }
 
 func (m *TodoTableModel) Blur() {
@@ -161,18 +159,19 @@ func (m *TodoTableModel) Focus() {
 	m.table.Focus()
 }
 
-func (m *TodoTableModel) SelectedId() (*uuid.UUID, error) {
+func (m *TodoTableModel) SelectedId() *uuid.UUID {
 	if len(m.todos) == 0 {
-		return nil, nil
+		return nil
 	}
 
 	row := m.table.SelectedRow()
 	id, err := uuid.Parse(row[0])
 	if err != nil {
-		return nil, err
+		m.errStr = err.Error()
+		return nil
 	}
 
-	return &id, nil
+	return &id
 }
 
 func (m *TodoTableModel) Toggle(id uuid.UUID) error {
