@@ -26,19 +26,6 @@ type TodoTableModel struct {
 	todos todo.Todos
 }
 
-type (
-	ToggleMsg struct{ id uuid.UUID }
-	DeleteMsg struct{ id uuid.UUID }
-)
-
-func (t *ToggleMsg) Id() uuid.UUID {
-	return t.id
-}
-
-func (t *DeleteMsg) Id() uuid.UUID {
-	return t.id
-}
-
 /* tea.Model Interface: Init, Update, View */
 
 func (m TodoTableModel) Init() tea.Cmd { return nil }
@@ -91,7 +78,7 @@ func (m *TodoTableModel) AddTodo(title string) error {
 
 	m.table = table.New(
 		table.WithColumns(m.table.Columns()),
-		table.WithRows(append(m.table.Rows(), t.IntoRow())),
+		table.WithRows(append(m.table.Rows(), t.Row())),
 		table.WithFocused(m.table.Focused()),
 		table.WithWidth(m.table.Width()),
 		table.WithHeight(m.table.Height()),
@@ -105,6 +92,20 @@ func (m *TodoTableModel) Blur() {
 
 func (m *TodoTableModel) Focus() {
 	m.table.Focus()
+}
+
+func (m *TodoTableModel) SelectedId() (*uuid.UUID, error) {
+	if len(m.todos) == 0 {
+		return nil, nil
+	}
+
+	row := m.table.SelectedRow()
+	id, err := uuid.Parse(row[0])
+	if err != nil {
+		return nil, err
+	}
+
+	return &id, nil
 }
 
 func (m *TodoTableModel) Toggle(id uuid.UUID) error {
@@ -126,22 +127,8 @@ func (m *TodoTableModel) Toggle(id uuid.UUID) error {
 		return err
 	}
 	m.todos[index] = *todo
-	m.table.SetRows(createRows(m.todos))
+	m.table.SetRows(m.todos.Rows())
 	return nil
-}
-
-func (m *TodoTableModel) SelectedTodo() (*todo.Todo, error) {
-	if len(m.todos) == 0 {
-		return nil, nil
-	}
-	row := m.table.SelectedRow()
-	id := uuid.MustParse(row[0])
-	for _, item := range m.todos {
-		if item.ID == id {
-			return &item, nil
-		}
-	}
-	return nil, errors.New("could not find todo")
 }
 
 func (m *TodoTableModel) Delete(id uuid.UUID) error {
@@ -212,17 +199,9 @@ func (m *TodoTableModel) initTable(w, h int) {
 
 	m.table = table.New(
 		table.WithColumns(columns),
-		table.WithRows(createRows(m.todos)),
+		table.WithRows(m.todos.Rows()),
 		table.WithFocused(true),
 		table.WithWidth(w),
 		table.WithHeight(h),
 	)
-}
-
-func createRows(ts todo.Todos) []table.Row {
-	var rows []table.Row
-	for _, t := range ts {
-		rows = append(rows, t.IntoRow())
-	}
-	return rows
 }

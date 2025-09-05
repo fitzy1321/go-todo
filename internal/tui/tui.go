@@ -3,21 +3,22 @@ package tui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fitzy1321/go-todo/internal/db"
+	"github.com/google/uuid"
 )
 
 type sessionState int
 
 const (
 	tableView sessionState = iota
-	addTodoView
+	entryFormView
 )
 
 type AppModel struct {
 	db    *db.AppDB
 	state sessionState
 
-	entryForm EntryFormModel
-	table     TodoTableModel
+	entryForm tea.Model
+	table     tea.Model
 	extra     string
 }
 
@@ -35,26 +36,29 @@ func NewApp(db *db.AppDB) *AppModel {
 }
 
 type (
-	formMsg  struct{}
-	tableMsg struct{}
+	EntryFormMsg struct{}
+	TableMsg     struct{}
+	ToggleMsg    struct{ id uuid.UUID }
+	DeleteMsg    struct{ id uuid.UUID }
 )
 
-func switchToForm() tea.Msg {
-	return formMsg{}
+func (t *ToggleMsg) Id() uuid.UUID {
+	return t.id
 }
 
-func switchToTable() tea.Msg {
-	return tableMsg{}
+func (t *DeleteMsg) Id() uuid.UUID {
+	return t.id
 }
 
 func (m AppModel) Init() tea.Cmd { return nil }
 
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.extra = ""
+	var cmd tea.Cmd
 	switch msg := msg.(type) {
-	case formMsg:
-		m.state = addTodoView
-	case tableMsg:
+	case EntryFormMsg:
+		m.state = entryFormView
+	case TableMsg:
 		m.state = tableView
 
 	case tea.KeyMsg:
@@ -65,65 +69,71 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "n":
 			// Make a new Todo
 			if m.state == tableView {
-				m.table.Blur()
-				m.entryForm.Focus()
-				return m, switchToForm
+				mTable := m.table.(TodoTableModel)
+				mTable.Blur()
+				m.table = mTable
+				mEntryForm := m.entryForm.(EntryFormModel)
+				mEntryForm.Focus()
+				m.entryForm = mEntryForm
+				return m, func() tea.Msg { return EntryFormMsg{} }
 			}
 		case "d":
 			// delete Todo
 			if m.state == tableView {
-				todo, err := m.table.SelectedTodo()
+				mTable := m.table.(TodoTableModel)
+				id, err := mTable.SelectedId()
 				if err != nil {
 					m.extra = err.Error()
 					return m, nil
 				}
-				if todo == nil {
+				if id == nil {
 					m.extra = "Warn: 'delete cmd' could not find todo object"
 					return m, nil
 				}
-				mt, cmd := m.table.Update(DeleteMsg{id: todo.ID})
-				m.table = mt.(TodoTableModel)
+				m.table, cmd = mTable.Update(DeleteMsg{id: *id})
 				return m, cmd
 			}
 		case "t":
 			if m.state == tableView {
-				todo, err := m.table.SelectedTodo()
+				mTable := m.table.(TodoTableModel)
+				id, err := mTable.SelectedId()
 				if err != nil {
 					m.extra = err.Error()
 					return m, nil
 				}
-				if todo == nil {
+				if id == nil {
 					m.extra = "Warn: 'toggle cmd' could not find todo object"
 					return m, nil
 				}
-				mt, cmd := m.table.Update(ToggleMsg{id: todo.ID})
-				m.table = mt.(TodoTableModel)
+				m.table, cmd = mTable.Update(ToggleMsg{id: *id})
 				return m, cmd
 			}
 		case "enter":
-			if m.state == addTodoView {
-				title := m.entryForm.text.Value()
+			if m.state == entryFormView {
+				mTable := m.table.(TodoTableModel)
+				mEntryForm := m.entryForm.(EntryFormModel)
+				title := mEntryForm.Value()
 				if title == "" {
 					return m, nil
 				}
-				if err := m.table.AddTodo(title); err != nil {
+				if err := mTable.AddTodo(title); err != nil {
 					// TODO: do something here
 				}
-				m.entryForm = NewEntryForm()
-				m.entryForm.Blur()
-				m.table.Focus()
-				return m, switchToTable
+				mEntryForm = NewEntryForm()
+				mEntryForm.Blur()
+				m.entryForm = mEntryForm
+				mTable.Focus()
+				m.table = mTable
+				return m, func() tea.Msg { return TableMsg{} }
 			}
 		}
 	}
 	switch m.state {
 	case tableView:
-		mt, cmd := m.table.Update(msg)
-		m.table = mt.(TodoTableModel)
+		m.table, cmd = m.table.Update(msg)
 		return m, cmd
-	case addTodoView:
-		mt, cmd := m.entryForm.Update(msg)
-		m.entryForm = mt.(EntryFormModel)
+	case entryFormView:
+		m.entryForm, cmd = m.entryForm.Update(msg)
 		return m, cmd
 	}
 	return m, nil
@@ -136,7 +146,7 @@ func (m AppModel) View() string {
 			return m.table.View() + "\n" + m.extra + "\n"
 		}
 		return m.table.View()
-	case addTodoView:
+	case entryFormView:
 		return m.entryForm.View()
 	default:
 		return "Something has gone wrong ..."

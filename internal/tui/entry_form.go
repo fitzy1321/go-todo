@@ -40,3 +40,7 @@ func (m *EntryFormModel) Blur() {
 func (m *EntryFormModel) Focus() {
 	m.text.Focus()
 }
+
+func (m *EntryFormModel) Value() string {
+	return m.text.Value()
+}

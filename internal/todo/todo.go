@@ -37,7 +37,7 @@ func (t *Todo) Toggle() {
 	}
 }
 
-func (t Todo) IntoRow() table.Row {
+func (t Todo) Row() table.Row {
 	completedAtStr := " ~ "
 	if t.CompletedAt != nil {
 		completedAtStr = t.CompletedAt.String()
@@ -61,4 +61,12 @@ func (t *Todos) GetTitles() []string {
 		titles = append(titles, item.Title)
 	}
 	return titles
+}
+
+func (t *Todos) Rows() []table.Row {
+	var rows []table.Row
+	for _, todo := range *t {
+		rows = append(rows, todo.Row())
+	}
+	return rows
 }
