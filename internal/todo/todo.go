@@ -1,26 +1,19 @@
 package todo
 
 import (
+	"strconv"
 	"time"
 
+	"github.com/charmbracelet/bubbles/table"
 	"github.com/google/uuid"
 )
-
-// Ideas for other statuses
-// type status int
-
-// const (
-// 	notStarted status = iota
-// 	wip
-// 	done
-// )
 
 type Todo struct {
 	ID          uuid.UUID
 	Title       string
 	Completed   bool
 	CreatedAt   time.Time
-	CompletedAt *time.Time // pointer makes it nullable
+	CompletedAt *time.Time
 }
 
 type Todos []Todo
@@ -34,6 +27,30 @@ func New(title string) Todo {
 	return Todo{uuid.New(), title, false, time.Now(), nil}
 }
 
+func (t *Todo) Toggle() {
+	t.Completed = !t.Completed
+	if t.Completed {
+		now := time.Now()
+		t.CompletedAt = &now
+	} else {
+		t.CompletedAt = nil
+	}
+}
+
+func (t Todo) IntoRow() table.Row {
+	completedAtStr := " ~ "
+	if t.CompletedAt != nil {
+		completedAtStr = t.CompletedAt.String()
+	}
+	return table.Row{
+		t.ID.String(),
+		t.Title,
+		strconv.FormatBool(t.Completed),
+		t.CreatedAt.String(),
+		completedAtStr,
+	}
+}
+
 func NewTodos() Todos {
 	return Todos{}
 }
@@ -45,13 +62,3 @@ func (t *Todos) GetTitles() []string {
 	}
 	return titles
 }
-
-// func (t *Todo) Toggle() {
-// 	t.Completed = !t.Completed
-// 	if t.Completed {
-// 		now := time.Now()
-// 		t.CompletedAt = &now
-// 	} else {
-// 		t.CompletedAt = nil
-// 	}
-// }

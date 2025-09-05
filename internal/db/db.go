@@ -35,12 +35,13 @@ func New(path string) (*AppDB, error) {
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_todos_title_unique ON todos (title)`,
 		// Archive table
 		`CREATE TABLE IF NOT EXISTS todos_archive (
-		id TEXT PRIMARY KEY,
+		archive_id TEXT PRIMARY KEY,
+		todos_id TEXT NOT NULL,
 		title TEXT NOT NULL,
 		completed BOOLEAN DEFAULT FALSE,
 		created_at DATETIME NOT NULL,
 		completed_at DATETIME NULL,
-		archived_at DATETIME NOT NULL
+		archived_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`,
 		// Trigger for archive table
 		// Prevent update trigger
@@ -58,8 +59,7 @@ func New(path string) (*AppDB, error) {
 	}
 
 	for _, q := range queries {
-		_, err = db.Exec(q)
-		if err != nil {
+		if _, err = db.Exec(q); err != nil {
 			return nil, err
 		}
 	}
@@ -77,18 +77,18 @@ func (a *AppDB) Close() error {
 func (a *AppDB) CreateTodo(title string) (todo.Todo, error) {
 	ntodo := todo.New(title)
 	query := "INSERT INTO todos (id, title, created_at) VALUES (?, ?, ?)"
-	_, err := a.db.Exec(
+	if _, err := a.db.Exec(
 		query,
 		ntodo.ID,
 		ntodo.Title,
 		ntodo.CreatedAt,
-	)
-	if err != nil {
+	); err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 			return ntodo, fmt.Errorf("todo item '%s' arleady exists", ntodo.Title)
 		}
+		return ntodo, err
 	}
-	return ntodo, err
+	return ntodo, nil
 }
 
 func (a *AppDB) ListAllTodos() (todo.Todos, error) {
@@ -105,8 +105,13 @@ func (a *AppDB) ListAllTodos() (todo.Todos, error) {
 		var idStr string
 		var completedAt sql.NullTime
 
-		err := rows.Scan(&idStr, &todo.Title, &todo.Completed, &todo.CreatedAt, &completedAt)
-		if err != nil {
+		if err := rows.Scan(
+			&idStr,
+			&todo.Title,
+			&todo.Completed,
+			&todo.CreatedAt,
+			&completedAt,
+		); err != nil {
 			return nil, err
 		}
 
@@ -137,8 +142,14 @@ func (a *AppDB) ListAllArchives() (archive []todo.TodoArchive, err error) {
 		var idStr string
 		var completedAt sql.NullTime
 
-		err := rows.Scan(&idStr, &todo.Title, &todo.Completed, &todo.CreatedAt, &completedAt, &todo.ArchivedAt)
-		if err != nil {
+		if err := rows.Scan(
+			&idStr,
+			&todo.Title,
+			&todo.Completed,
+			&todo.CreatedAt,
+			&completedAt,
+			&todo.ArchivedAt,
+		); err != nil {
 			return nil, err
 		}
 
@@ -157,9 +168,32 @@ func (a *AppDB) ListAllArchives() (archive []todo.TodoArchive, err error) {
 }
 
 func (a *AppDB) UpdateTodo(t todo.Todo) error {
-	query := "UPDATE todos SET title=?, completed=? completed_at=? WHERE id=?"
-	_, err := a.db.Exec(query, t.Title, t.Completed, t.CompletedAt, t.ID)
-	if err != nil {
+	query := "UPDATE todos SET completed=?, completed_at=? WHERE id=?"
+	if _, err := a.db.Exec(
+		query,
+		t.Completed,
+		t.CompletedAt,
+		t.ID,
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *AppDB) DeleteTodo(t todo.Todo) error {
+	query := "DELETE FROM todos WHERE id=?"
+	if _, err := a.db.Exec(query, t.ID.String()); err != nil {
+		return err
+	}
+	if _, err := a.db.Exec(
+		"INSERT INTO todos_archive (archive_id, todos_id, title, completed, created_at, completed_at) VALUES (?, ?, ?, ?, ?, ?)",
+		uuid.New(),
+		t.ID,
+		t.Title,
+		t.Completed,
+		t.CreatedAt,
+		t.CompletedAt,
+	); err != nil {
 		return err
 	}
 	return nil

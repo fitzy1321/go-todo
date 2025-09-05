@@ -1,3 +1,4 @@
 **/*.db
 **/*.json
 **/*tmp
+**/*.DS_Store

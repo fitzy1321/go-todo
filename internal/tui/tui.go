@@ -18,6 +18,7 @@ type AppModel struct {
 
 	entryForm EntryFormModel
 	table     TodoTableModel
+	extra     string
 }
 
 func NewApp(db *db.AppDB) *AppModel {
@@ -49,7 +50,7 @@ func switchToTable() tea.Msg {
 func (m AppModel) Init() tea.Cmd { return nil }
 
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
+	m.extra = ""
 	switch msg := msg.(type) {
 	case formMsg:
 		m.state = addTodoView
@@ -60,8 +61,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
-		case "d":
-			// TODO: delete Todo
+
 		case "n":
 			// Make a new Todo
 			if m.state == tableView {
@@ -69,28 +69,47 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.entryForm.Focus()
 				return m, switchToForm
 			}
+		case "d":
+			// delete Todo
+			if m.state == tableView {
+				todo, err := m.table.SelectedTodo()
+				if err != nil {
+					m.extra = err.Error()
+					return m, nil
+				}
+				if todo == nil {
+					m.extra = "Warn: 'delete cmd' could not find todo object"
+					return m, nil
+				}
+				mt, cmd := m.table.Update(DeleteMsg{id: todo.ID})
+				m.table = mt.(TodoTableModel)
+				return m, cmd
+			}
 		case "t":
 			if m.state == tableView {
-				if err := m.table.Toggle(); err != nil {
-
+				todo, err := m.table.SelectedTodo()
+				if err != nil {
+					m.extra = err.Error()
+					return m, nil
 				}
-				mT, cmd := m.table.Update(msg)
-				m.table = mT.(TodoTableModel)
+				if todo == nil {
+					m.extra = "Warn: 'toggle cmd' could not find todo object"
+					return m, nil
+				}
+				mt, cmd := m.table.Update(ToggleMsg{id: todo.ID})
+				m.table = mt.(TodoTableModel)
 				return m, cmd
 			}
 		case "enter":
-			switch m.state {
-			case tableView:
-
-			case addTodoView:
+			if m.state == addTodoView {
 				title := m.entryForm.text.Value()
 				if title == "" {
 					return m, nil
 				}
-				err := m.table.AddTodo(title)
-				if err != nil {
+				if err := m.table.AddTodo(title); err != nil {
 					// TODO: do something here
 				}
+				m.entryForm = NewEntryForm()
 				m.entryForm.Blur()
 				m.table.Focus()
 				return m, switchToTable
@@ -99,14 +118,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	switch m.state {
 	case tableView:
-		var t tea.Model
-		t, cmd = m.table.Update(msg)
-		m.table = t.(TodoTableModel)
+		mt, cmd := m.table.Update(msg)
+		m.table = mt.(TodoTableModel)
 		return m, cmd
 	case addTodoView:
-		var t tea.Model
-		t, cmd = m.entryForm.Update(msg)
-		m.entryForm = t.(EntryFormModel)
+		mt, cmd := m.entryForm.Update(msg)
+		m.entryForm = mt.(EntryFormModel)
 		return m, cmd
 	}
 	return m, nil
@@ -115,9 +132,13 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m AppModel) View() string {
 	switch m.state {
 	case tableView:
+		if m.extra != "" {
+			return m.table.View() + "\n" + m.extra + "\n"
+		}
 		return m.table.View()
 	case addTodoView:
 		return m.entryForm.View()
+	default:
+		return "Something has gone wrong ..."
 	}
-	return "Under Construction"
 }
