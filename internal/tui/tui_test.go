@@ -13,7 +13,7 @@ func TestTuiStart(t *testing.T) {
 	}
 	defer db.Close()
 
-	appModel := NewApp(db)
+	appModel := NewModel(db)
 	if appModel.state != tableView {
 		t.Error("Inital appModel.state value is wrong!")
 	}

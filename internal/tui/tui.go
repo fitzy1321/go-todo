@@ -22,7 +22,7 @@ type AppKeyMap struct {
 	TodoTableKeyMap
 }
 
-type AppModel struct {
+type Model struct {
 	db       *db.AppDB
 	errorStr string
 	keyMap   AppKeyMap
@@ -33,11 +33,11 @@ type AppModel struct {
 	table     tea.Model
 }
 
-func NewApp(db *db.AppDB) *AppModel {
+func NewModel(db *db.AppDB) *Model {
 	addTodoForm := NewEntryForm()
 	table := NewTodoTable(db)
 	table.Focus()
-	t := AppModel{
+	t := Model{
 		db:        db,
 		state:     tableView,
 		entryForm: addTodoForm,
@@ -62,9 +62,9 @@ func (t *DeleteMsg) Id() uuid.UUID {
 	return t.id
 }
 
-func (m AppModel) Init() tea.Cmd { return nil }
+func (m Model) Init() tea.Cmd { return nil }
 
-func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.errorStr = ""
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
@@ -175,7 +175,7 @@ var (
 			Foreground(lipgloss.Color("#B50235"))
 )
 
-func (m AppModel) View() string {
+func (m Model) View() string {
 	switch m.state {
 	case tableView:
 		var b strings.Builder

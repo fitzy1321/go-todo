@@ -11,7 +11,7 @@ import (
 )
 
 type Todo struct {
-	ID          uuid.UUID
+	Id          uuid.UUID
 	Title       string
 	Completed   bool
 	CreatedAt   time.Time
@@ -26,7 +26,13 @@ type TodoArchive struct {
 }
 
 func New(title string) Todo {
-	return Todo{uuid.New(), title, false, time.Now(), nil}
+	return Todo{
+		Id:          uuid.New(),
+		Title:       title,
+		Completed:   false,
+		CreatedAt:   time.Now(),
+		CompletedAt: nil,
+	}
 }
 
 func (t *Todo) Toggle() {
@@ -45,7 +51,7 @@ func (t Todo) Row() table.Row {
 		completedAtStr = t.CompletedAt.String()
 	}
 	return table.Row{
-		t.ID.String(),
+		t.Id.String(),
 		t.Title,
 		strconv.FormatBool(t.Completed),
 		t.CreatedAt.String(),

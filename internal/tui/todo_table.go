@@ -138,11 +138,11 @@ func NewTodoTable(db *db.AppDB) TodoTableModel {
 }
 
 func (m *TodoTableModel) AddTodo(title string) {
-	t, err := m.db.CreateTodo(strings.TrimSpace(title))
+	mTodo, err := m.db.CreateTodo(strings.TrimSpace(title))
 	if err != nil {
 		m.errStr = err.Error()
 	}
-	m.todos = append(m.todos, t)
+	m.todos = append(m.todos, mTodo)
 	sort.Slice(m.todos, func(i, j int) bool {
 		return m.todos[i].CreatedAt.Before(m.todos[j].CreatedAt)
 	})
@@ -176,11 +176,12 @@ func (e NilRowError) Error() string {
 	return ""
 }
 
-// Error my return 3 different types
-// 1. std `error`
-// 2. `ZeroTodosError` ~ when the todos slice is empty
-// 3. `NilRowError` ~ when m.tables.SelectedRow() returns nil
-//   - This happens sometimes when the table cursor is out-of-bonds
+/*
+The error returned may be 3 different types:
+ 1. std `error` ~ most likely parsing UUID error
+ 2. `ZeroTodosError` ~ when the todos slice is empty
+ 3. `NilRowError` ~ when the table cursor is out-of-bonds.
+*/
 func (m *TodoTableModel) SelectedId() (*uuid.UUID, error) {
 	if len(m.todos) == 0 {
 		return nil, ZeroTodosError{}
@@ -199,33 +200,34 @@ func (m *TodoTableModel) SelectedId() (*uuid.UUID, error) {
 }
 
 func (m *TodoTableModel) Toggle(id uuid.UUID) error {
-	var todo *todo.Todo
+	var mTodo *todo.Todo
 	var index int
 	for i, t := range m.todos {
-		if t.ID == id {
-			todo = &t
+		if t.Id == id {
+			mTodo = &t
 			index = i
 		}
 	}
-	if todo == nil {
+	if mTodo == nil {
 		return errors.New("fucking hell, Toggle is broke")
 	}
 
-	todo.Toggle()
+	mTodo.Toggle()
 
-	if err := m.db.UpdateTodo(*todo); err != nil {
+	if err := m.db.UpdateTodo(*mTodo); err != nil {
 		return err
 	}
-	m.todos[index] = *todo
+	m.todos[index] = *mTodo
 	m.table.SetRows(m.todos.Rows())
 	return nil
 }
 
 func (m *TodoTableModel) Delete(id uuid.UUID) error {
 	var mTodo todo.Todo
+	var mTodoId = id.String()
 	var index *int
 	for i, t := range m.todos {
-		if t.ID == id {
+		if t.Id.String() == mTodoId {
 			mTodo = t
 			index = &i
 			break
@@ -242,7 +244,7 @@ func (m *TodoTableModel) Delete(id uuid.UUID) error {
 		m.todos = append(m.todos[:*index], m.todos[*index+1:]...)
 		rows := m.table.Rows()
 		for i, r := range rows {
-			if r[0] == mTodo.ID.String() {
+			if r[0] == mTodoId {
 				index = &i
 				break
 			}

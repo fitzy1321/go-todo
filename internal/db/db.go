@@ -79,7 +79,7 @@ func (a *AppDB) CreateTodo(title string) (todo.Todo, error) {
 	query := "INSERT INTO todos (id, title, created_at) VALUES (?, ?, ?)"
 	if _, err := a.db.Exec(
 		query,
-		ntodo.ID,
+		ntodo.Id,
 		ntodo.Title,
 		ntodo.CreatedAt,
 	); err != nil {
@@ -115,7 +115,7 @@ func (a *AppDB) ListAllTodos() (todo.Todos, error) {
 			return nil, err
 		}
 
-		todo.ID, err = uuid.Parse(idStr)
+		todo.Id, err = uuid.Parse(idStr)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +153,7 @@ func (a *AppDB) ListAllArchives() (archive []todo.TodoArchive, err error) {
 			return nil, err
 		}
 
-		todo.ID, err = uuid.Parse(idStr)
+		todo.Id, err = uuid.Parse(idStr)
 		if err != nil {
 			return nil, err
 		}
@@ -173,7 +173,7 @@ func (a *AppDB) UpdateTodo(t todo.Todo) error {
 		query,
 		t.Completed,
 		t.CompletedAt,
-		t.ID,
+		t.Id,
 	); err != nil {
 		return err
 	}
@@ -182,13 +182,13 @@ func (a *AppDB) UpdateTodo(t todo.Todo) error {
 
 func (a *AppDB) DeleteTodo(t todo.Todo) error {
 	query := "DELETE FROM todos WHERE id=?"
-	if _, err := a.db.Exec(query, t.ID.String()); err != nil {
+	if _, err := a.db.Exec(query, t.Id.String()); err != nil {
 		return err
 	}
 	if _, err := a.db.Exec(
 		"INSERT INTO todos_archive (archive_id, todos_id, title, completed, created_at, completed_at) VALUES (?, ?, ?, ?, ?, ?)",
 		uuid.New(),
-		t.ID,
+		t.Id,
 		t.Title,
 		t.Completed,
 		t.CreatedAt,

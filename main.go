@@ -21,7 +21,7 @@ func main() {
 	}
 	defer adb.Close()
 
-	p := tea.NewProgram(tui.NewApp(adb), tea.WithAltScreen())
+	p := tea.NewProgram(tui.NewModel(adb), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("An error occured: %v", err)
 		os.Exit(1)

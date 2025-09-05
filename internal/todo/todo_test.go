@@ -13,7 +13,7 @@ func TestGetTitle(t *testing.T) {
 	var todos todo.Todos
 	for _, item := range titles {
 		todos = append(todos, todo.Todo{
-			ID:    uuid.New(),
+			Id:    uuid.New(),
 			Title: item,
 		})
 	}
